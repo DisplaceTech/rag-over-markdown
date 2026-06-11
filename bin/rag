@@ -134,7 +134,8 @@ switch ($command) {
         $query = $positional[0] ?? fail('usage: rag search QUERY');
         [$retriever] = retriever($embedder(), $options);
         foreach ($retriever->retrieve($query, $options['k']) as $hit) {
-            printf("%.3f  %-28s %s\n", $hit['score'], $hit['file'], mb_strimwidth(trim($hit['text']), 0, 96, '…'));
+            $preview = (string) preg_replace('/\s+/u', ' ', trim($hit['text']));
+            printf("%.3f  %-28s %s\n", $hit['score'], $hit['file'], mb_strimwidth($preview, 0, 96, '…'));
         }
         break;
 
