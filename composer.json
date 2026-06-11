@@ -27,7 +27,8 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
-        "phpstan/phpstan": "^2.1"
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^11.5 || ^12.0"
     },
     "autoload": {
         "psr-4": {
@@ -40,14 +41,21 @@
     "scripts": {
         "check": [
             "@cs",
-            "@stan"
+            "@stan",
+            "@test"
         ],
         "cs": "php-cs-fixer fix --dry-run --diff",
         "cs:fix": "php-cs-fixer fix",
-        "stan": "phpstan analyse"
+        "stan": "phpstan analyse",
+        "test": "phpunit"
     },
     "config": {
         "sort-packages": true,
         "platform-check": false
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Displace\\Rag\\Tests\\": "tests/"
+        }
     }
 }

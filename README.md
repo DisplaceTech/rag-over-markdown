@@ -118,6 +118,23 @@ Worth reading in order: [`Corpus`](src/Corpus.php) →
 - Model paths are overridable via `RAG_EMBED_MODEL`, `RAG_CHAT_MODEL`,
   and `RAG_RERANK_MODEL`.
 
+## Testing
+
+```sh
+composer test
+```
+
+The pipeline logic is tested **without models or extensions**: because
+`Retriever` and `Indexer` depend on the
+[ai-contracts](https://github.com/DisplaceTech/ai-contracts) interfaces,
+their behavior (query-prefix handling, hit hydration, rerank over-fetch
+and re-mapping, index↔sidecar drift detection) is proven against tiny
+in-memory fakes in [`tests/Fake/`](tests/Fake/) — that's the
+testability the contracts buy, demonstrated. A full end-to-end test
+(index → search → ask over the sample corpus) runs automatically when
+the extensions are loaded and `models/` is populated, and skips cleanly
+otherwise; CI runs the fake-backed tier only.
+
 ## Deliberately out of scope
 
 **Document formats beyond markdown** — PDF/HTML extraction is your

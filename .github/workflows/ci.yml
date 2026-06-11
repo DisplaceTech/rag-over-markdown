@@ -9,12 +9,14 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  # Static checks only: the runtime pipeline needs the ext-infer and
-  # ext-turbovec binaries plus ~1.9GB of GGUF models, which stay out of
-  # CI by design (same policy as the extensions themselves). PHPStan
-  # analyzes against the committed extension stubs instead.
+  # Static checks + the contract-level unit tests. The Retriever/Corpus
+  # tests run against in-memory ai-contracts fakes — no extensions, no
+  # models. The end-to-end test self-skips here: it needs the ext-infer
+  # and ext-turbovec binaries plus ~1.3GB of GGUF models, which stay out
+  # of CI by design (same policy as the extensions themselves). PHPStan
+  # analyzes against the committed extension stubs.
   lint:
-    name: cs + static analysis (PHP ${{ matrix.php }})
+    name: cs + static analysis + tests (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -36,3 +38,5 @@ jobs:
         if: matrix.php == '8.4'
 
       - run: composer stan
+
+      - run: composer test
