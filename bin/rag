@@ -1,0 +1,164 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Displace\Infer\Model;
+use Displace\Infer\RerankModel;
+use Displace\Rag\Adapter\InferEmbedder;
+use Displace\Rag\Adapter\InferReranker;
+use Displace\Rag\Adapter\TurbovecIndex;
+use Displace\Rag\Answerer;
+use Displace\Rag\Corpus;
+use Displace\Rag\Indexer;
+use Displace\Rag\Retriever;
+
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+const USAGE = <<<TXT
+    rag — retrieval-augmented generation over a folder of markdown,
+          entirely inside the PHP process.
+
+    Usage:
+      rag index  [--corpus DIR] [--data DIR]            Embed + persist the corpus
+      rag search QUERY [--k N] [--rerank] [--data DIR]  Top-k chunks for a query
+      rag ask    QUESTION [--k N] [--rerank] [--data DIR]
+                                                        Retrieve, then answer with citations
+
+    Model files (override with environment variables):
+      RAG_EMBED_MODEL   default models/Qwen3-Embedding-0.6B-Q8_0.gguf
+      RAG_CHAT_MODEL    default models/Qwen3-0.6B-Q8_0.gguf
+      RAG_RERANK_MODEL  default models/Qwen3-Reranker-0.6B-Q8_0.gguf (only with --rerank)
+
+    See README.md for the model download one-liners.
+    TXT;
+
+/** @param list<string> $argv */
+function parse(array $argv): array
+{
+    array_shift($argv);
+    $command = array_shift($argv) ?? 'help';
+    $options = ['corpus' => 'corpus', 'data' => 'data', 'k' => 4, 'rerank' => false];
+    $positional = [];
+
+    while ($argv !== []) {
+        $arg = array_shift($argv);
+        match (true) {
+            $arg === '--rerank' => $options['rerank'] = true,
+            $arg === '--corpus' => $options['corpus'] = array_shift($argv) ?? fail('--corpus needs a value'),
+            $arg === '--data' => $options['data'] = array_shift($argv) ?? fail('--data needs a value'),
+            $arg === '--k' => $options['k'] = (int) (array_shift($argv) ?? fail('--k needs a value')),
+            str_starts_with($arg, '--') => fail("Unknown option: {$arg}"),
+            default => $positional[] = $arg,
+        };
+    }
+
+    return [$command, $positional, $options];
+}
+
+function fail(string $message): never
+{
+    fwrite(STDERR, "error: {$message}\n");
+    exit(1);
+}
+
+function modelPath(string $env, string $default): string
+{
+    $path = getenv($env) ?: $default;
+    if (!is_file($path)) {
+        fail("missing model file {$path} — see README.md for the download command (override with {$env})");
+    }
+
+    return $path;
+}
+
+/** @return array{Retriever, list<array{id: int, file: string, text: string}>} */
+function retriever(InferEmbedder $embedder, array $options): array
+{
+    $dataDir = $options['data'];
+    if (!is_file("{$dataDir}/index.tvim") || !is_file("{$dataDir}/chunks.json")) {
+        fail("no index found in {$dataDir}/ — run `rag index` first");
+    }
+
+    /** @var array{dimensions: int, chunks: list<array{id: int, file: string, text: string}>} $meta */
+    $meta = json_decode((string) file_get_contents("{$dataDir}/chunks.json"), true, flags: JSON_THROW_ON_ERROR);
+
+    $reranker = null;
+    if ($options['rerank']) {
+        $reranker = new InferReranker(RerankModel::load(
+            modelPath('RAG_RERANK_MODEL', 'models/Qwen3-Reranker-0.6B-Q8_0.gguf'),
+        ));
+    }
+
+    $chunks = array_column($meta['chunks'], null, 'id');
+    $retriever = new Retriever(
+        $embedder,
+        TurbovecIndex::open("{$dataDir}/index.tvim"),
+        $chunks,
+        reranker: $reranker,
+    );
+
+    return [$retriever, $chunks];
+}
+
+[$command, $positional, $options] = parse($argv);
+
+if ($command === 'help' || $command === '--help' || $command === '-h') {
+    echo USAGE, PHP_EOL;
+    exit(0);
+}
+
+$embedder = static fn(): InferEmbedder => new InferEmbedder(Model::load(
+    modelPath('RAG_EMBED_MODEL', 'models/Qwen3-Embedding-0.6B-Q8_0.gguf'),
+    ['embedding' => true, 'pooling' => 'last'],   // Qwen3-Embedding requires last-token pooling
+));
+
+switch ($command) {
+    case 'index':
+        $chunks = (new Corpus())->chunks($options['corpus']);
+        printf("Indexing %d chunks from %s/ ...\n", count($chunks), rtrim($options['corpus'], '/'));
+        (new Indexer($embedder()))->build(
+            $chunks,
+            $options['data'],
+            static fn(int $done, int $total) => printf("\r  %d / %d embedded", $done, $total),
+        );
+        printf("\nWrote %s/index.tvim + chunks.json\n", $options['data']);
+        break;
+
+    case 'search':
+        $query = $positional[0] ?? fail('usage: rag search QUERY');
+        [$retriever] = retriever($embedder(), $options);
+        foreach ($retriever->retrieve($query, $options['k']) as $hit) {
+            printf("%.3f  %-28s %s\n", $hit['score'], $hit['file'], mb_strimwidth(trim($hit['text']), 0, 96, '…'));
+        }
+        break;
+
+    case 'ask':
+        $question = $positional[0] ?? fail('usage: rag ask QUESTION');
+        [$retriever] = retriever($embedder(), $options);
+        $hits = $retriever->retrieve($question, $options['k']);
+
+        $chat = Model::load(modelPath('RAG_CHAT_MODEL', 'models/Qwen3-0.6B-Q8_0.gguf'));
+        $result = (new Answerer($chat))->answer($question, $hits);
+
+        echo $result['answer'], PHP_EOL;
+        if (!$result['confident']) {
+            echo "\n(the model reports low confidence — the corpus may not cover this)\n";
+        }
+        if ($result['sources'] !== []) {
+            echo "\nSources:\n";
+            foreach ($result['sources'] as $source) {
+                printf("  %.3f  %s\n", $source['score'], $source['file']);
+            }
+        }
+        break;
+
+    default:
+        fwrite(STDERR, "Unknown command: {$command}\n\n" . USAGE . PHP_EOL);
+        exit(1);
+}
