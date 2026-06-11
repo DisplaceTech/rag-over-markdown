@@ -29,6 +29,10 @@ final class EndToEndTest extends TestCase
 
     protected function setUp(): void
     {
+        // Assigned before the skip guards: tearDown() runs even for
+        // skipped tests and must not hit an uninitialized property.
+        $this->dataDir = sys_get_temp_dir() . '/rag-e2e-' . bin2hex(random_bytes(6));
+
         if (!\extension_loaded('infer') || !\extension_loaded('turbovec')) {
             self::markTestSkipped('requires the infer + turbovec extensions');
         }
@@ -36,8 +40,6 @@ final class EndToEndTest extends TestCase
         if (!is_file(self::EMBED_MODEL) || !is_file(self::CHAT_MODEL)) {
             self::markTestSkipped('requires the GGUF models from the README under models/');
         }
-
-        $this->dataDir = sys_get_temp_dir() . '/rag-e2e-' . bin2hex(random_bytes(6));
     }
 
     protected function tearDown(): void
