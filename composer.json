@@ -1,0 +1,53 @@
+{
+    "name": "displace/rag-over-markdown",
+    "description": "Reference RAG pipeline over a folder of markdown — ext-infer + ext-turbovec + ai-toolkit. No services, no Python, no data leaving the box.",
+    "type": "project",
+    "license": "MIT",
+    "keywords": [
+        "rag",
+        "semantic-search",
+        "llm",
+        "embeddings",
+        "local-first",
+        "markdown"
+    ],
+    "homepage": "https://github.com/DisplaceTech/rag-over-markdown",
+    "authors": [
+        {
+            "name": "Eric Mann",
+            "homepage": "https://eamann.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-infer": "*",
+        "ext-turbovec": "*",
+        "displace/ai-contracts": "^0.1",
+        "displace/ai-toolkit": "^0.1"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Displace\\Rag\\": "src/"
+        }
+    },
+    "bin": [
+        "bin/rag"
+    ],
+    "scripts": {
+        "check": [
+            "@cs",
+            "@stan"
+        ],
+        "cs": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "stan": "phpstan analyse"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform-check": false
+    }
+}

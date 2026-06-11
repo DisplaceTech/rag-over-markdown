@@ -1,0 +1,20 @@
+# Composer
+/vendor/
+composer.lock
+
+# Local model files — see README for download commands
+/models/
+*.gguf
+
+# Built index artifacts
+/data/
+
+# Tool caches
+.php-cs-fixer.cache
+.phpstan/
+
+# Editor/IDE noise
+.idea/
+.vscode/
+*.swp
+.DS_Store

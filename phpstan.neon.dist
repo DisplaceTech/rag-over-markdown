@@ -1,0 +1,10 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - bin
+    scanFiles:
+        # IDE/analysis stubs for the two extensions; refresh from the
+        # upstream repos' stubs/ when bumping the extension versions.
+        - stubs/infer.stubs.php
+        - stubs/vector.stubs.php
