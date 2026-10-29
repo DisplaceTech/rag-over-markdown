@@ -13,6 +13,16 @@
 
 ---
 
+## Status
+
+Feature-complete for its scope. Maintained: dependency updates and
+new extension releases ship as patch/minor releases — see the
+[CHANGELOG](CHANGELOG.md). Last verified: PHP 8.3/8.4/8.5 (fake-backed tier, CI), and the full end-to-end tier on PHP 8.3 with ext-infer 0.2.1 + ext-turbovec 0.2.0 and the Qwen3 0.6B models, 2026-10-29.
+
+Bug reports and ideas go in [issues](https://github.com/DisplaceTech/rag-over-markdown/issues).
+**Co-maintainers welcome** — if you run this in production and want a
+say in where it goes, open an issue or a PR.
+
 ## What is this?
 
 The reference implementation for the Displace local-first AI stack —
@@ -52,9 +62,16 @@ pipeline.
 [PIE](https://github.com/php/pie)):
 
 ```sh
-php pie.phar install displace/ext-infer
-php pie.phar install displace/ext-turbovec
+php pie.phar install displace/ext-infer:^0.2.1
+php pie.phar install displace/ext-turbovec:^0.2
 ```
+
+**ext-infer 0.2.1 or later is required.** On 0.2.0, an answer prompt
+over 2048 tokens (`--k 8` on a ~30 KB corpus is enough) aborts the PHP
+process inside llama.cpp; 0.2.1 fixes it. ext-turbovec 0.1 still works,
+but 0.2 uses half the memory and drops the OpenBLAS runtime dependency.
+**Upgrading ext-turbovec from 0.1 to 0.2? Re-run `bin/rag index`:** 0.1
+index files can't be loaded by 0.2.
 
 **2. Install and grab the models** (~1.3GB for the required two):
 
@@ -132,8 +149,9 @@ and re-mapping, index↔sidecar drift detection) is proven against tiny
 in-memory fakes in [`tests/Fake/`](tests/Fake/) — that's the
 testability the contracts buy, demonstrated. A full end-to-end test
 (index → search → ask over the sample corpus) runs automatically when
-the extensions are loaded and `models/` is populated, and skips cleanly
-otherwise; CI runs the fake-backed tier only.
+the extensions are loaded and `models/` is populated (or
+`RAG_EMBED_MODEL` / `RAG_CHAT_MODEL` point at the models elsewhere), and
+skips cleanly otherwise; CI runs the fake-backed tier only.
 
 ## Deliberately out of scope
 
@@ -143,6 +161,30 @@ seconds; rebuild is the feature · **a web UI** — this is plumbing,
 shaped for reading · **multi-tenancy / auth** — see ext-turbovec's
 allowlist filtering for where that hook goes · **streaming answers** —
 when ext-infer ships streaming (v0.3+), this repo gets it for free.
+
+## Part of a stack
+
+Transcribe → chunk → embed → search → answer, entirely on your hardware:
+
+| Stage | Package | What it does |
+| ----- | ------- | ------------ |
+| Transcribe | [ext-whisper](https://github.com/DisplaceTech/ext-whisper) | Speech-to-text over whisper.cpp |
+| Chunk | [ai-toolkit](https://github.com/DisplaceTech/ai-toolkit) | Text chunkers and packed-vector math, pure PHP |
+| Embed · rerank · answer | [ext-infer](https://github.com/DisplaceTech/ext-infer) | Local LLM chat, embeddings and reranking over llama.cpp |
+| Search | [ext-turbovec](https://github.com/DisplaceTech/ext-turbovec) | Compressed in-memory vector search (TurboQuant) |
+| Integrate | [ai-contracts](https://github.com/DisplaceTech/ai-contracts) | The interfaces frameworks code against |
+| Reference app | **rag-over-markdown** (this repo) | The whole pipeline over a folder of markdown |
+
+Every package links the others; the extensions share one scaffold,
+[ext-template](https://github.com/DisplaceTech/ext-template).
+
+## Writing about this
+
+- [RAG Over Markdown: An End-to-End Local Pipeline in Pure PHP](https://eric.mann.blog/rag-over-markdown-local-pipeline-php/)
+- [From Voice to Vectors: Building a Searchable Audio Archive in PHP](https://eric.mann.blog/voice-to-vectors-audio-search-php/)
+
+The stack's launch series ran Sept 22 – Oct 1, 2026; everything else
+is at [eric.mann.blog/writing](https://eric.mann.blog/writing/).
 
 ## License
 
