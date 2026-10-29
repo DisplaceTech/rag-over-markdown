@@ -20,7 +20,7 @@
     ],
     "require": {
         "php": "^8.3",
-        "ext-infer": "*",
+        "ext-infer": ">=0.2.1",
         "ext-turbovec": "*",
         "displace/ai-contracts": "^0.1",
         "displace/ai-toolkit": "^0.1"
