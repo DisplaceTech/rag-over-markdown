@@ -12,6 +12,7 @@ composer.lock
 # Tool caches
 .php-cs-fixer.cache
 .phpstan/
+.phpunit.cache/
 
 # Editor/IDE noise
 .idea/
