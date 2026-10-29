@@ -19,26 +19,32 @@ use PHPUnit\Framework\TestCase;
  * policy as the extensions' own suites); locally:
  *
  *     composer test   # with models/ populated per the README
+ *
+ * Model paths honour the same RAG_EMBED_MODEL / RAG_CHAT_MODEL overrides
+ * as bin/rag, so the models can live outside the checkout.
  */
 final class EndToEndTest extends TestCase
 {
-    private const EMBED_MODEL = __DIR__ . '/../models/Qwen3-Embedding-0.6B-Q8_0.gguf';
-    private const CHAT_MODEL = __DIR__ . '/../models/Qwen3-0.6B-Q8_0.gguf';
-
     private string $dataDir;
+
+    private string $embedModel;
+
+    private string $chatModel;
 
     protected function setUp(): void
     {
         // Assigned before the skip guards: tearDown() runs even for
         // skipped tests and must not hit an uninitialized property.
         $this->dataDir = sys_get_temp_dir() . '/rag-e2e-' . bin2hex(random_bytes(6));
+        $this->embedModel = getenv('RAG_EMBED_MODEL') ?: __DIR__ . '/../models/Qwen3-Embedding-0.6B-Q8_0.gguf';
+        $this->chatModel = getenv('RAG_CHAT_MODEL') ?: __DIR__ . '/../models/Qwen3-0.6B-Q8_0.gguf';
 
         if (!\extension_loaded('infer') || !\extension_loaded('turbovec')) {
             self::markTestSkipped('requires the infer + turbovec extensions');
         }
 
-        if (!is_file(self::EMBED_MODEL) || !is_file(self::CHAT_MODEL)) {
-            self::markTestSkipped('requires the GGUF models from the README under models/');
+        if (!is_file($this->embedModel) || !is_file($this->chatModel)) {
+            self::markTestSkipped('requires the GGUF models from the README under models/ (or RAG_EMBED_MODEL / RAG_CHAT_MODEL)');
         }
     }
 
@@ -51,7 +57,7 @@ final class EndToEndTest extends TestCase
 
     public function testIndexSearchAskOverTheSampleCorpus(): void
     {
-        $embedder = new InferEmbedder(Model::load(self::EMBED_MODEL, [
+        $embedder = new InferEmbedder(Model::load($this->embedModel, [
             'embedding' => true,
             'pooling' => 'last',
         ]));
@@ -76,7 +82,7 @@ final class EndToEndTest extends TestCase
 
         // Generation: schema-constrained answer cites the runbook and
         // contains the fact ("one hour").
-        $chat = Model::load(self::CHAT_MODEL);
+        $chat = Model::load($this->chatModel);
         $result = (new Answerer($chat))->answer('How long does an account lockout last?', $hits);
 
         self::assertStringContainsStringIgnoringCase('one hour', $result['answer']);
