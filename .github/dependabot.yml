@@ -10,6 +10,9 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Widen rather than replace ranges so the PHPUnit constraint keeps
+    # an older major available for the oldest supported PHP.
+    versioning-strategy: widen
     commit-message:
       prefix: "chore(deps)"
     groups:
